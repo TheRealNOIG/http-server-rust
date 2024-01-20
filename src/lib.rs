@@ -1,16 +1,27 @@
-use std::net::TcpStream;
+use std::fmt::{self, Display};
 
 //https://developer.mozilla.org/en-US/docs/Web/HTTP/Status#client_error_responses
 #[derive(Debug)]
-pub enum HttpErrorCode {
-    BadRequest = 400,
-    Forbidden = 403,
-    NotFound = 404,
+pub enum HttpRequestCode {
+    Ok,
+    BadRequest,
+    Forbidden,
+    NotFound,
+}
+impl HttpRequestCode {
+    pub fn to_tuple(&self) -> (usize, &'static str) {
+        match self {
+            HttpRequestCode::Ok => (200, "OK"),
+            HttpRequestCode::BadRequest => (400, "Bad Request"),
+            HttpRequestCode::Forbidden => (403, "Forbidden"),
+            HttpRequestCode::NotFound => (404, "Not Found"),
+        }
+    }
 }
 
 #[derive(Debug)]
 pub enum HttpError {
-    HttpParseError(String, HttpErrorCode),
+    HttpParseError(String, HttpRequestCode),
 }
 
 //https://developer.mozilla.org/en-US/docs/Web/HTTP/Methods
@@ -41,7 +52,7 @@ impl TryFrom<String> for HttpMethod {
             "OPTIONS" => Ok(Self::OPTIONS),
             _ => Err(HttpError::HttpParseError(
                 format!("Invalid HTTP method: {}", s),
-                HttpErrorCode::BadRequest,
+                HttpRequestCode::BadRequest,
             )),
         }
     }
@@ -66,9 +77,23 @@ impl TryFrom<String> for HttpVersion {
             "HTTP/3.0" => Ok(Self::HTTP_3_0),
             _ => Err(HttpError::HttpParseError(
                 format!("Invalid HTTP version: {}", s),
-                HttpErrorCode::BadRequest,
+                HttpRequestCode::BadRequest,
             )),
         }
+    }
+}
+impl Display for HttpVersion {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "{}",
+            match self {
+                Self::HTTP_1_0 => "HTTP/1.0",
+                Self::HTTP_1_1 => "HTTP/1.1",
+                Self::HTTP_2_0 => "HTTP/2.0",
+                Self::HTTP_3_0 => "HTTP/3.0",
+            }
+        )
     }
 }
 
@@ -91,7 +116,7 @@ impl StartLine {
             }),
             _ => Err(HttpError::HttpParseError(
                 start_line.to_string(),
-                HttpErrorCode::BadRequest,
+                HttpRequestCode::BadRequest,
             )),
         }
     }

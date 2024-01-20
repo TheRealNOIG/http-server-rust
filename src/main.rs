@@ -3,7 +3,7 @@ use std::{
     net::{TcpListener, TcpStream},
 };
 
-use http_server_starter_rust::{HttpError, HttpErrorCode, StartLine};
+use http_server_starter_rust::{HttpError, HttpRequestCode, StartLine};
 
 fn main() {
     let listener = TcpListener::bind("127.0.0.1:4221").unwrap();
@@ -32,21 +32,40 @@ fn handle_stream(mut stream: TcpStream) -> Result<(), HttpError> {
     if http_request.is_empty() {
         return Err(HttpError::HttpParseError(
             "Empty request".to_string(),
-            HttpErrorCode::BadRequest,
+            HttpRequestCode::BadRequest,
         ));
     }
     println!("request: {:#?}", http_request);
 
     let start_line = StartLine::new(&http_request[0].clone())?;
 
-    let response: &[u8] = if start_line.path == "/" {
-        b"HTTP/1.1 200 OK\r\n\r\n"
-    } else {
-        b"HTTP/1.1 404 Not Found\r\n\r\n"
+    let response: String = match start_line.path.as_str() {
+        "/" => status_code(&start_line, HttpRequestCode::Ok) + "\r\n",
+        path if path.starts_with("/echo/") => handle_echo(path, &start_line),
+        _ => status_code(&start_line, HttpRequestCode::NotFound) + "\r\n",
     };
+    println!("response: {:#?}", response);
 
     stream
-        .write_all(response)
-        .map_err(|e| HttpError::HttpParseError(e.to_string(), HttpErrorCode::BadRequest))
+        .write_all(&response.as_bytes())
+        .map_err(|e| HttpError::HttpParseError(e.to_string(), HttpRequestCode::BadRequest))
+}
+
+fn status_code(start_line: &StartLine, code: HttpRequestCode) -> String {
+    let (number, phrase) = code.to_tuple();
+    format!("{} {} {}\r\n", start_line.version, number, phrase)
+}
+//TODO: make header struct and have it generate the header string
+fn handle_echo(path: &str, start_line: &StartLine) -> String {
+    let reply = path.splitn(3, '/').skip(2).collect::<Vec<&str>>().join("/");
+    let status_line = status_code(start_line, HttpRequestCode::Ok);
+    let formatted_response = format!(
+        "{}{}Content-Length: {}\r\n\r\n{}\r\n",
+        status_line,
+        "Content-Type: text/plain\r\n",
+        reply.len(),
+        reply,
+    );
+    formatted_response
 }
 
