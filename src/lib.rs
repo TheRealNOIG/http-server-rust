@@ -75,12 +75,12 @@ impl TryFrom<String> for HttpVersion {
 //https://developer.mozilla.org/en-US/docs/Web/HTTP/Messages#start_line
 #[derive(Debug)]
 pub struct StartLine {
-    method: HttpMethod,
-    path: String,
-    version: HttpVersion,
+    pub method: HttpMethod,
+    pub path: String,
+    pub version: HttpVersion,
 }
 impl StartLine {
-    pub fn new(start_line: String) -> Result<Self, HttpError> {
+    pub fn new(start_line: &String) -> Result<Self, HttpError> {
         let mut parts = start_line.split_whitespace();
 
         match (parts.next(), parts.next(), parts.next()) {
@@ -90,7 +90,7 @@ impl StartLine {
                 version: HttpVersion::try_from(version.to_string())?,
             }),
             _ => Err(HttpError::HttpParseError(
-                start_line,
+                start_line.to_string(),
                 HttpErrorCode::BadRequest,
             )),
         }
