@@ -122,3 +122,27 @@ impl StartLine {
     }
 }
 
+//https://developer.mozilla.org/en-US/docs/Glossary/Representation_header
+#[derive(Debug)]
+pub struct RepresentationHeader {
+    pub content_type: String,
+    pub content_length: usize,
+}
+impl RepresentationHeader {
+    pub fn new(content_type: &str, content_length: usize) -> RepresentationHeader {
+        RepresentationHeader {
+            content_type: content_type.to_string(),
+            content_length,
+        }
+    }
+}
+impl fmt::Display for RepresentationHeader {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "Content-Type: {}\r\nContent-Length: {}\r\n\r\n",
+            self.content_type, self.content_length
+        )
+    }
+}
+

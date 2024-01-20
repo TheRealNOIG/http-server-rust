@@ -3,7 +3,7 @@ use std::{
     net::{TcpListener, TcpStream},
 };
 
-use http_server_starter_rust::{HttpError, HttpRequestCode, StartLine};
+use http_server_starter_rust::{HttpError, HttpRequestCode, RepresentationHeader, StartLine};
 
 fn main() {
     let listener = TcpListener::bind("127.0.0.1:4221").unwrap();
@@ -55,17 +55,13 @@ fn status_code(start_line: &StartLine, code: HttpRequestCode) -> String {
     let (number, phrase) = code.to_tuple();
     format!("{} {} {}\r\n", start_line.version, number, phrase)
 }
-//TODO: make header struct and have it generate the header string
+
 fn handle_echo(path: &str, start_line: &StartLine) -> String {
     let reply = path.splitn(3, '/').skip(2).collect::<Vec<&str>>().join("/");
     let status_line = status_code(start_line, HttpRequestCode::Ok);
-    let formatted_response = format!(
-        "{}{}Content-Length: {}\r\n\r\n{}\r\n",
-        status_line,
-        "Content-Type: text/plain\r\n",
-        reply.len(),
-        reply,
-    );
+    let header = RepresentationHeader::new("text/plain", reply.len());
+    let formatted_response = format!("{}{}{}\r\n", status_line, header.to_string(), reply,);
+
     formatted_response
 }
 
