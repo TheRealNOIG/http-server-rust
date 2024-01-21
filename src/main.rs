@@ -1,8 +1,6 @@
 use std::{
-    fs,
     io::{BufRead, BufReader, Write},
     net::{TcpListener, TcpStream},
-    path::Path,
     thread,
 };
 
@@ -51,9 +49,9 @@ fn handle_stream(mut stream: TcpStream) -> Result<(), HttpError> {
 
     let response: String = match start_line.path.as_str() {
         "/" => status_code(&start_line, HttpRequestCode::Ok) + "\r\n",
-        path if path.starts_with("/echo/") => handle_echo(&path, &start_line),
+        path if path.starts_with("/echo/") => handle_echo(path, &start_line),
         path if path.starts_with("/user-agent") => user_agent(&request_header, &start_line),
-        path if path.starts_with("/files/") => get_file(&path, &start_line),
+        path if path.starts_with("/files/") => get_file(path, &start_line),
         _ => status_code(&start_line, HttpRequestCode::NotFound) + "\r\n",
     };
     println!("response: {:#?}", response);
