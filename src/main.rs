@@ -1,6 +1,8 @@
 use std::{
+    fs,
     io::{BufRead, BufReader, Write},
     net::{TcpListener, TcpStream},
+    path::Path,
     thread,
 };
 
@@ -49,8 +51,9 @@ fn handle_stream(mut stream: TcpStream) -> Result<(), HttpError> {
 
     let response: String = match start_line.path.as_str() {
         "/" => status_code(&start_line, HttpRequestCode::Ok) + "\r\n",
-        path if path.starts_with("/echo/") => handle_echo(path, &start_line),
+        path if path.starts_with("/echo/") => handle_echo(&path, &start_line),
         path if path.starts_with("/user-agent") => user_agent(&request_header, &start_line),
+        path if path.starts_with("/files/") => get_file(&path, &start_line),
         _ => status_code(&start_line, HttpRequestCode::NotFound) + "\r\n",
     };
     println!("response: {:#?}", response);
@@ -90,6 +93,32 @@ fn user_agent(request_header: &RequestHeader, start_line: &StartLine) -> String 
         let header = RepresentationHeader::new("text/plain", 0);
 
         format!("{}{}{}\r\n", status_line, header, "")
+    }
+}
+
+fn get_file(path: &str, start_line: &StartLine) -> String {
+    let file_name = path.replace("/files/", "");
+    //get args stolen from https://github.com/junioramilson/codecrafters-http-server-rust/blob/c7abf1b7f330e2b16f5ea3e261bfddc75d39958d/src/main.rs
+    let args = std::env::args().collect::<Vec<_>>();
+    let file_directory: Option<String> = std::env::args()
+        .find(|arg| arg == "--directory")
+        .and_then(|arg| std::env::args().nth(&args.iter().position(|x| x == &arg).unwrap() + 1));
+    println!("file directory: {:?}", file_directory);
+
+    let file_path = format!("{}{}", file_directory.clone().unwrap(), file_name);
+    println!("path: {:?}", file_path);
+
+    match std::fs::read_to_string(&file_path) {
+        Ok(file) => {
+            let status_line = status_code(start_line, HttpRequestCode::Ok);
+            let header = RepresentationHeader::new("application/octet-stream", file.len());
+            format!("{}{}{}", status_line, header, file)
+        }
+        Err(_) => {
+            let status_line = status_code(start_line, HttpRequestCode::NotFound);
+            let header = RepresentationHeader::new("text/plain", 0);
+            format!("{}{}", status_line, header)
+        }
     }
 }
 
