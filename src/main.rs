@@ -1,11 +1,12 @@
 use std::{
+    fs::OpenOptions,
     io::{BufRead, BufReader, Read, Write},
     net::{TcpListener, TcpStream},
     thread,
 };
 
 use http_server_starter_rust::{
-    HttpError, HttpRequestCode, RepresentationHeader, RequestHeader, StartLine,
+    HttpError, HttpMethod, HttpRequestCode, RepresentationHeader, RequestHeader, StartLine,
 };
 
 fn main() {
@@ -29,19 +30,29 @@ fn main() {
 // The Book pg 463
 // TODO: Learn Tokio (easy right?)
 fn handle_stream(mut stream: TcpStream) -> Result<(), HttpError> {
-    let (start_line, request_header, _http_header, _body) = match parse_http_request(&stream) {
+    let (start_line, request_header, _http_header, body) = match parse_http_request(&stream) {
         Ok((start_line, request_header, headers, body)) => {
             (start_line, request_header, headers, body)
         }
         Err(e) => return Err(e),
     };
 
-    let response: String = match start_line.path.as_str() {
-        "/" => status_code(&start_line, HttpRequestCode::Ok) + "\r\n",
-        path if path.starts_with("/echo/") => handle_echo(path, &start_line),
-        path if path.starts_with("/user-agent") => user_agent(&request_header, &start_line),
-        path if path.starts_with("/files/") => get_file(path, &start_line),
-        _ => status_code(&start_line, HttpRequestCode::NotFound) + "\r\n",
+    let response: String = match start_line.method {
+        HttpMethod::GET => match start_line.path.as_str() {
+            "/" => status_code(&start_line, HttpRequestCode::Ok) + "\r\n",
+            path if path.starts_with("/echo/") => handle_echo(path, &start_line),
+            path if path.starts_with("/user-agent") => user_agent(&request_header, &start_line),
+            path if path.starts_with("/files/") => get_file(path, &start_line),
+            _ => status_code(&start_line, HttpRequestCode::NotFound) + "\r\n",
+        },
+        HttpMethod::POST => match start_line.path.as_str() {
+            path if path.starts_with("/files/") => match write_to_file(path, &body) {
+                Ok(_) => status_code(&start_line, HttpRequestCode::Created) + "\r\n",
+                Err(_) => status_code(&start_line, HttpRequestCode::InternalServerError) + "\r\n",
+            },
+            _ => status_code(&start_line, HttpRequestCode::NotFound) + "\r\n",
+        },
+        _ => status_code(&start_line, HttpRequestCode::MethodNotAllowed) + "\r\n",
     };
     println!("response: {:#?}", response);
 
@@ -83,13 +94,20 @@ fn user_agent(request_header: &RequestHeader, start_line: &StartLine) -> String 
     }
 }
 
+//get args stolen from https://github.com/junioramilson/codecrafters-http-server-rust/blob/c7abf1b7f330e2b16f5ea3e261bfddc75d39958d/src/main.rs
+fn get_file_directory() -> Option<String> {
+    let args = std::env::args().collect::<Vec<_>>();
+    std::env::args()
+        .find(|arg| arg == "--directory")
+        .and_then(|_| {
+            args.get(args.iter().position(|x| x == "--directory").unwrap() + 1)
+                .cloned()
+        })
+}
+
 fn get_file(path: &str, start_line: &StartLine) -> String {
     let file_name = path.replace("/files/", "");
-    //get args stolen from https://github.com/junioramilson/codecrafters-http-server-rust/blob/c7abf1b7f330e2b16f5ea3e261bfddc75d39958d/src/main.rs
-    let args = std::env::args().collect::<Vec<_>>();
-    let file_directory: Option<String> = std::env::args()
-        .find(|arg| arg == "--directory")
-        .and_then(|arg| std::env::args().nth(&args.iter().position(|x| x == &arg).unwrap() + 1));
+    let file_directory = get_file_directory();
     println!("file directory: {:?}", file_directory);
 
     let file_path = format!("{}{}", file_directory.clone().unwrap(), file_name);
@@ -107,6 +125,18 @@ fn get_file(path: &str, start_line: &StartLine) -> String {
             format!("{}{}", status_line, header)
         }
     }
+}
+
+fn write_to_file(path: &str, data: &str) -> std::io::Result<()> {
+    let file_name = path.replace("/files/", "");
+    let file_directory = get_file_directory();
+    let file_path = format!("{}{}", file_directory.clone().unwrap(), file_name);
+    let mut file = OpenOptions::new()
+        .write(true)
+        .create(true)
+        .open(file_path)?;
+    file.write_all(data.as_bytes())?;
+    Ok(())
 }
 
 fn parse_http_request(

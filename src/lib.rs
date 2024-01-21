@@ -7,18 +7,22 @@ use std::{
 #[derive(Debug)]
 pub enum HttpRequestCode {
     Ok,
+    Created,
     BadRequest,
     Forbidden,
     NotFound,
+    MethodNotAllowed,
     InternalServerError,
 }
 impl HttpRequestCode {
     pub fn to_tuple(&self) -> (usize, &'static str) {
         match self {
             HttpRequestCode::Ok => (200, "OK"),
+            HttpRequestCode::Created => (201, "Created"),
             HttpRequestCode::BadRequest => (400, "Bad Request"),
             HttpRequestCode::Forbidden => (403, "Forbidden"),
             HttpRequestCode::NotFound => (404, "Not Found"),
+            HttpRequestCode::MethodNotAllowed => (405, "Method Not Allowed"),
             HttpRequestCode::InternalServerError => (500, "Internal Server Error"),
         }
     }
