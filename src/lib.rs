@@ -10,6 +10,7 @@ pub enum HttpRequestCode {
     BadRequest,
     Forbidden,
     NotFound,
+    InternalServerError,
 }
 impl HttpRequestCode {
     pub fn to_tuple(&self) -> (usize, &'static str) {
@@ -18,6 +19,7 @@ impl HttpRequestCode {
             HttpRequestCode::BadRequest => (400, "Bad Request"),
             HttpRequestCode::Forbidden => (403, "Forbidden"),
             HttpRequestCode::NotFound => (404, "Not Found"),
+            HttpRequestCode::InternalServerError => (500, "Internal Server Error"),
         }
     }
 }

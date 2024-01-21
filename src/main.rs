@@ -55,7 +55,7 @@ fn handle_stream(mut stream: TcpStream) -> Result<(), HttpError> {
 
     stream
         .write_all(response.as_bytes())
-        .map_err(|e| HttpError::HttpParseError(e.to_string(), HttpRequestCode::BadRequest))
+        .map_err(|e| HttpError::HttpParseError(e.to_string(), HttpRequestCode::InternalServerError))
 }
 
 fn status_code(start_line: &StartLine, code: HttpRequestCode) -> String {
