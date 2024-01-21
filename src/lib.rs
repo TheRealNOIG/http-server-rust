@@ -191,15 +191,5 @@ impl RequestHeader {
     pub fn get_header(&self, key: &str) -> Option<&String> {
         self.headers.get(key)
     }
-    pub fn parse_from_http_request(&mut self, http_request: &[String]) {
-        for line in http_request.iter().skip(1) {
-            let parts: Vec<&str> = line.splitn(2, ':').collect();
-            if parts.len() == 2 {
-                let key = parts[0].trim();
-                let value = parts[1].trim();
-                self.add_header(key, value);
-            }
-        }
-    }
 }
 
