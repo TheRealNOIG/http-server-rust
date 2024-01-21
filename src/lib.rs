@@ -1,4 +1,7 @@
-use std::fmt::{self, Display};
+use std::{
+    collections::HashMap,
+    fmt::{self, Display},
+};
 
 //https://developer.mozilla.org/en-US/docs/Web/HTTP/Status#client_error_responses
 #[derive(Debug)]
@@ -18,10 +21,25 @@ impl HttpRequestCode {
         }
     }
 }
+impl Display for HttpRequestCode {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let (_, description) = self.to_tuple();
+        write!(f, "{}", description)
+    }
+}
 
 #[derive(Debug)]
 pub enum HttpError {
     HttpParseError(String, HttpRequestCode),
+}
+impl Display for HttpError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            HttpError::HttpParseError(msg, code) => {
+                write!(f, "HTTP Parse Error ({}): {}", code, msg)
+            }
+        }
+    }
 }
 
 //https://developer.mozilla.org/en-US/docs/Web/HTTP/Methods
@@ -143,6 +161,43 @@ impl fmt::Display for RepresentationHeader {
             "Content-Type: {}\r\nContent-Length: {}\r\n\r\n",
             self.content_type, self.content_length
         )
+    }
+}
+
+//https://developer.mozilla.org/en-US/docs/Glossary/Request_header
+#[derive(Debug)]
+pub struct RequestHeader {
+    pub headers: HashMap<String, String>,
+}
+impl RequestHeader {
+    pub fn from_http_request(http_request: &[String]) -> RequestHeader {
+        let mut headers = HashMap::new();
+        // Skip the start line
+        for line in http_request.iter().skip(1) {
+            let parts: Vec<&str> = line.splitn(2, ':').collect();
+            if parts.len() == 2 {
+                let key = parts[0].trim().to_string();
+                let value = parts[1].trim().to_string();
+                headers.insert(key, value);
+            }
+        }
+        RequestHeader { headers }
+    }
+    pub fn add_header(&mut self, key: &str, value: &str) {
+        self.headers.insert(key.to_string(), value.to_string());
+    }
+    pub fn get_header(&self, key: &str) -> Option<&String> {
+        self.headers.get(key)
+    }
+    pub fn parse_from_http_request(&mut self, http_request: &[String]) {
+        for line in http_request.iter().skip(1) {
+            let parts: Vec<&str> = line.splitn(2, ':').collect();
+            if parts.len() == 2 {
+                let key = parts[0].trim();
+                let value = parts[1].trim();
+                self.add_header(key, value);
+            }
+        }
     }
 }
 
