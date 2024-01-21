@@ -1,5 +1,5 @@
 use std::{
-    io::{BufRead, BufReader, Write},
+    io::{BufRead, BufReader, Read, Write},
     net::{TcpListener, TcpStream},
     thread,
 };
@@ -29,23 +29,12 @@ fn main() {
 // The Book pg 463
 // TODO: Learn Tokio (easy right?)
 fn handle_stream(mut stream: TcpStream) -> Result<(), HttpError> {
-    let buf_reader = BufReader::new(&mut stream);
-    let http_request: Vec<_> = buf_reader
-        .lines()
-        .map(|result| result.unwrap())
-        .take_while(|line| !line.is_empty())
-        .collect();
-    if http_request.is_empty() {
-        return Err(HttpError::HttpParseError(
-            "Empty request".to_string(),
-            HttpRequestCode::BadRequest,
-        ));
-    }
-    println!("request: {:#?}", http_request);
-
-    let start_line = StartLine::new(&http_request[0].clone())?;
-    let request_header = RequestHeader::from_http_request(&http_request);
-    println!("Headers: {:#?}", request_header);
+    let (start_line, request_header, _http_header, _body) = match parse_http_request(&stream) {
+        Ok((start_line, request_header, headers, body)) => {
+            (start_line, request_header, headers, body)
+        }
+        Err(e) => return Err(e),
+    };
 
     let response: String = match start_line.path.as_str() {
         "/" => status_code(&start_line, HttpRequestCode::Ok) + "\r\n",
@@ -118,5 +107,50 @@ fn get_file(path: &str, start_line: &StartLine) -> String {
             format!("{}{}", status_line, header)
         }
     }
+}
+
+fn parse_http_request(
+    stream: &TcpStream,
+) -> Result<(StartLine, RequestHeader, Vec<String>, String), HttpError> {
+    let mut buf_reader = BufReader::new(stream);
+    let mut header = Vec::new();
+    let mut body = String::new();
+
+    loop {
+        let mut line = String::new();
+        let bytes_read = buf_reader.read_line(&mut line)?;
+        if bytes_read == 0 || line == "\r\n" {
+            break;
+        }
+        header.push(line.trim_end().to_string());
+    }
+    if header.is_empty() {
+        return Err(HttpError::HttpParseError(
+            "Empty request".to_string(),
+            HttpRequestCode::BadRequest,
+        ));
+    }
+    println!("Headers: {:?}", header);
+
+    let start_line = StartLine::new(&header[0])?;
+    let request_header = RequestHeader::from_http_request(&header);
+    println!("Request: {:#?}", header);
+    println!("{:#?}", request_header);
+
+    if let Some(content_length_str) = request_header.get_header("Content-Length") {
+        if let Ok(content_length) = content_length_str.parse::<usize>() {
+            let mut body_bytes = vec![0; content_length];
+            buf_reader.read_exact(&mut body_bytes)?;
+            body = String::from_utf8(body_bytes).map_err(|_| {
+                HttpError::HttpParseError(
+                    "Invalid UTF-8 sequence in body".to_string(),
+                    HttpRequestCode::BadRequest,
+                )
+            })?;
+        }
+    }
+    println!("Body: {}", body);
+
+    Ok((start_line, request_header, header, body))
 }
 

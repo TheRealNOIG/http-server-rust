@@ -43,6 +43,11 @@ impl Display for HttpError {
         }
     }
 }
+impl From<std::io::Error> for HttpError {
+    fn from(err: std::io::Error) -> Self {
+        HttpError::HttpParseError(err.to_string(), HttpRequestCode::BadRequest)
+    }
+}
 
 //https://developer.mozilla.org/en-US/docs/Web/HTTP/Methods
 #[derive(Debug)]
@@ -190,6 +195,16 @@ impl RequestHeader {
     }
     pub fn get_header(&self, key: &str) -> Option<&String> {
         self.headers.get(key)
+    }
+}
+
+#[derive(Debug)]
+pub struct RequestBody {
+    pub content: String,
+}
+impl RequestBody {
+    pub fn new(content: String) -> RequestBody {
+        RequestBody { content }
     }
 }
 
