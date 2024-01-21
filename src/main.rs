@@ -1,6 +1,7 @@
 use std::{
     io::{BufRead, BufReader, Write},
     net::{TcpListener, TcpStream},
+    thread,
 };
 
 use http_server_starter_rust::{
@@ -11,7 +12,7 @@ fn main() {
     let listener = TcpListener::bind("127.0.0.1:4221").unwrap();
 
     for stream in listener.incoming() {
-        match stream {
+        thread::spawn(|| match stream {
             Ok(_stream) => {
                 println!("accepted new connection");
                 if let Err(e) = handle_stream(_stream) {
@@ -21,11 +22,12 @@ fn main() {
             Err(e) => {
                 println!("error: {}", e);
             }
-        }
+        });
     }
 }
 
 // The Book pg 463
+// TODO: Learn Tokio (easy right?)
 fn handle_stream(mut stream: TcpStream) -> Result<(), HttpError> {
     let buf_reader = BufReader::new(&mut stream);
     let http_request: Vec<_> = buf_reader
